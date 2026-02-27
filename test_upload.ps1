@@ -1,5 +1,5 @@
 
-$fileContent = "This is a test document for BMAD knowledge base."
+$fileContent = "This is a test document for knowledge base."
 $filePath = "test_upload.txt"
 $fileContent | Out-File -FilePath $filePath -Encoding utf8
 
