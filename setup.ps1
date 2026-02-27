@@ -1,10 +1,10 @@
-# Bmad-method Environment Check Script
+# Environment Check Script
 # System: Windows (PowerShell)
 
 $ErrorActionPreference = "Continue"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "   Bmad-method Env Check Tool (v1.0)" -ForegroundColor Cyan
+Write-Host "  Env Check Tool (v1.0)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 $allPassed = $true
