@@ -1,0 +1,139 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.bmad'
+version = '0.0.1-SNAPSHOT'
+
+// 使用 Java 17 工具链确保构建环境一致
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// 后端依赖：Web API + 校验 + 文档解析 + 向量检索
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    
+    // Lucene for Vector Search
+    implementation 'org.apache.lucene:lucene-core:9.9.1'
+    implementation 'org.apache.lucene:lucene-queryparser:9.9.1'
+    implementation 'org.apache.lucene:lucene-analysis-common:9.9.1'
+    
+    // Document Parsing
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+    implementation 'org.apache.pdfbox:pdfbox:3.0.1'
+    implementation 'com.vladsch.flexmark:flexmark-all:0.64.8'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// CMake 集成：该部分逻辑将 C++ 构建流程无缝嵌入 Gradle 生命周期中。
+def cppDir = file('src/main/cpp')
+def buildDir = new File(cppDir, 'build')
+
+/**
+ * cmakeConfigure 任务：生成构建系统配置文件。
+ * 1. 自动清理旧的构建缓存，防止因生成器变更引发的错误。
+ * 2. 显式指定 Visual Studio 18 2026 (x64) 生成器，确保构建输出结构一致。
+ */
+tasks.register('cmakeConfigure', Exec) {
+    group = 'build'
+    description = '使用 CMake 生成 Visual Studio 构建工程。'
+    workingDir buildDir
+    
+    // 命令分解：cmake [源目录] -G [生成器名] -A [架构名]
+    commandLine 'cmake', '-G', 'Visual Studio 18 2026', '-A', 'x64', '..'
+    
+    doFirst {
+        // 保证构建目录存在且为空，实现幂等性构建
+        if (buildDir.exists()) {
+            buildDir.deleteDir()
+        }
+        buildDir.mkdirs()
+    }
+}
+
+/**
+ * cmakeBuild 任务：触发 C++ 编译器（MSVC）进行实际编译。
+ * 依赖于 cmakeConfigure，生成 Release 版本的动态链接库。
+ */
+tasks.register('cmakeBuild', Exec) {
+    group = 'build'
+    description = '运行 MSVC 编译器生成动态链接库 (.dll)。'
+    dependsOn 'cmakeConfigure'
+    workingDir buildDir
+    
+    // 使用 --config Release 参数，开启编译器优化并剥离调试符号
+    commandLine 'cmake', '--build', '.', '--config', 'Release'
+}
+
+/**
+ * copyNativeLibs 任务：将编译好的原生二进制文件同步到 Java 资源目录。
+ * 只有完成此步骤，LlamaNative 才能在运行/测试时通过类路径加载到库。
+ */
+tasks.register('copyNativeLibs', Copy) {
+    group = 'build'
+    description = '将 .dll 文件从 cmake 构建目录同步到 resources/lib。'
+    dependsOn 'cmakeBuild'
+    
+    // 自动适配 Release 输出子目录
+    from new File(buildDir, 'Release')
+    into file('src/main/resources/lib')
+    include '*.dll', '*.so', '*.dylib'
+}
+
+/**
+ * buildNative 任务：原生构建流程的总控开关。
+ * 开发者可以通过运行 `./gradlew buildNative` 单独触发本地库更新。
+ */
+tasks.register('buildNative') {
+    group = 'build'
+    description = '执行完整的 Native 构建与库文件同步流程。'
+    dependsOn 'copyNativeLibs'
+}
+
+/**
+ * 确保在 Java 资源处理（processResources）阶段之前，
+ * 原生库已经编译并拷贝到了 resources 目录下，从而被打包进类路径。
+ */
+processResources.dependsOn 'copyNativeLibs'
+
+/**
+ * bootRun 配置：
+ * 1. 将包含原生库的目录添加到 java.library.path，确保 System.loadLibrary 能找到 .dll 文件。
+ * 2. 这里的路径指向编译输出目录，确保开发阶段无需手动安装库文件。
+ */
+bootRun {
+    systemProperty "java.library.path", file("src/main/resources/lib").absolutePath
+}
+
+test {
+    useJUnitPlatform()
+    // 测试环境下也需要加载原生库
+    systemProperty "java.library.path", file("src/main/resources/lib").absolutePath
+}
+
+// 生命周期钩子：将 Native 构建挂载到标准构建流程中。
+// 1. 在编译 Java 源码前，必须先准备好 Native 层。
+compileJava.dependsOn buildNative
+// 2. 在处理资源文件时，确保 .dll 已进入 resources 目录以便打包。
+processResources.dependsOn copyNativeLibs
+
+/**
+ * 测试环境增强：
+ * JUnit 在执行时需要知道 .dll 的位置，否则会出现 UnsatisfiedLinkError。
+ * 通过设置 java.library.path 属性，将 resources/lib 目录加入加载路径。
+ */
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty "java.library.path", file("src/main/resources/lib").absolutePath
+}

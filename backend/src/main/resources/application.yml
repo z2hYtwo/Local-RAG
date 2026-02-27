@@ -1,0 +1,10 @@
+bmad:
+  model:
+    path: "E:/Model/Qwen_Qwen3-0.6B-Q4_K_M.gguf"
+    off-heap: true
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
