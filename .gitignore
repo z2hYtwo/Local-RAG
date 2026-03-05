@@ -1,0 +1,66 @@
+# BMAD related
+_bmad/
+_bmad-output/
+.agents/
+.claude/
+.cursor/
+.trae/
+
+# Gradle
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+/backend/build/
+/backend/bin/
+/backend/lucene_index/
+.gradle_home/
+.settings/
+.gradle/
+.classpath
+.project
+.out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.trae/
+._bmad
+._bmad-output/
+.agents/
+.claude/
+.cursor/
+.vscode/
+.docs/
+# C++ Build
+/backend/src/main/cpp/build/
+/backend/src/main/resources/lib/*.dll
+/backend/src/main/resources/lib/*.so
+/backend/src/main/resources/lib/*.dylib
+
+# Node / Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temp
+tmp/
+temp/
+test_upload.ps1
+
+# Project Specific
+/lucene_index/
+/.gradle_home/
+/models/
+/backend/src/main/resources/lib/
